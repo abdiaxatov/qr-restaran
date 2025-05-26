@@ -34,6 +34,8 @@ import {
   Wifi,
   WifiOff,
   MoreVertical,
+  ImageIcon,
+  Save,
 } from "lucide-react"
 import {
   type MenuItem,
@@ -66,6 +68,8 @@ export default function Dashboard() {
   const { toast } = useToast()
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isUpdating, setIsUpdating] = useState(false)
 
   const [newItem, setNewItem] = useState({
     name: "",
@@ -88,6 +92,8 @@ export default function Dashboard() {
     image: "",
   })
 
+  const [imagePreviewStatus, setImagePreviewStatus] = useState<"loading" | "success" | "error" | "none">("none")
+
   const addVariant = () => {
     if (!currentVariant.name || !currentVariant.price) {
       toast({
@@ -102,16 +108,25 @@ export default function Dashboard() {
       id: Date.now().toString(),
       name: currentVariant.name,
       price: Number.parseFloat(currentVariant.price),
-      image: currentVariant.image,
+      image: currentVariant.image || undefined,
       isAvailable: true,
     }
 
     setNewItemVariants([...newItemVariants, variant])
     setCurrentVariant({ name: "", price: "", image: "" })
+
+    toast({
+      title: "Variant qo'shildi",
+      description: `${variant.name} variant ro'yxatga qo'shildi`,
+    })
   }
 
   const removeVariant = (id: string) => {
     setNewItemVariants(newItemVariants.filter((v) => v.id !== id))
+    toast({
+      title: "Variant o'chirildi",
+      description: "Variant ro'yxatdan olib tashlandi",
+    })
   }
 
   useEffect(() => {
@@ -142,8 +157,8 @@ export default function Dashboard() {
           })
 
           toast({
-            title: "Firebasega ulanish muvaffaqiyatli",
-            description: "Real vaqt yangilanishlari faol",
+            title: "🔥 Firebase ulanishi faol",
+            description: "Real vaqt yangilanishlari ishlamoqda",
           })
         } else {
           setIsConnected(false)
@@ -159,8 +174,8 @@ export default function Dashboard() {
           })
 
           toast({
-            title: "Mahalliy rejimda ishlash",
-            description: "Ma'lumotlar brauzeringizda mahalliy ravishda saqlanadi",
+            title: "💾 Mahalliy rejim",
+            description: "Ma'lumotlar brauzeringizda saqlanadi",
             variant: "destructive",
           })
         }
@@ -170,8 +185,8 @@ export default function Dashboard() {
         setConnectionMode("local")
 
         toast({
-          title: "Ulanishda xatolik",
-          description: "Mahalliy xotira rejimini ishlatish",
+          title: "⚠️ Ulanish xatosi",
+          description: "Mahalliy xotira rejimiga o'tildi",
           variant: "destructive",
         })
       } finally {
@@ -212,57 +227,173 @@ export default function Dashboard() {
     })
     setNewItemVariants([])
     setCurrentVariant({ name: "", price: "", image: "" })
+    setImagePreviewStatus("none")
   }
 
-  const handleAddItem = async () => {
-    if (!newItem.name || !newItem.price || !newItem.category) {
-      toast({
-        title: "Ma'lumot yetishmayapti",
-        description: "Iltimos, barcha majburiy maydonlarni to'ldiring",
-        variant: "destructive",
-      })
+  const validateImageUrl = (url: string): boolean => {
+    if (!url.trim()) return true // Empty is allowed
+
+    try {
+      const urlObj = new URL(url.trim())
+      // Check if it's a valid HTTP/HTTPS URL
+      return urlObj.protocol === "http:" || urlObj.protocol === "https:"
+    } catch {
+      // Check if it's a relative path
+      return url.startsWith("/") || url.startsWith("./") || url.includes("placeholder.svg")
+    }
+  }
+
+  const handleImageChange = (url: string) => {
+    setNewItem({ ...newItem, image: url })
+
+    if (!url.trim()) {
+      setImagePreviewStatus("none")
       return
     }
 
+    if (!validateImageUrl(url)) {
+      setImagePreviewStatus("error")
+      return
+    }
+
+    setImagePreviewStatus("loading")
+
+    // Test image loading
+    const img = new Image()
+    img.onload = () => setImagePreviewStatus("success")
+    img.onerror = () => setImagePreviewStatus("error")
+    img.src = url.trim()
+  }
+
+  const validateForm = (): boolean => {
+    console.log("🔍 Validating form...")
+
+    if (!newItem.name.trim()) {
+      console.log("❌ Name validation failed")
+      toast({
+        title: "❌ Nomi kiritilmagan",
+        description: "Ovqat nomini kiriting",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    const price = Number.parseFloat(newItem.price)
+    if (!newItem.price || isNaN(price) || price <= 0) {
+      console.log("❌ Price validation failed:", newItem.price, price)
+      toast({
+        title: "❌ Narx noto'g'ri",
+        description: "To'g'ri narx kiriting (0 dan katta son)",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (!newItem.category) {
+      console.log("❌ Category validation failed")
+      toast({
+        title: "❌ Kategoriya tanlanmagan",
+        description: "Ovqat kategoriyasini tanlang",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (newItem.image && !validateImageUrl(newItem.image)) {
+      console.log("❌ Image URL validation failed")
+      toast({
+        title: "❌ Noto'g'ri rasm URL",
+        description: "To'g'ri rasm URL manzilini kiriting",
+        variant: "destructive",
+      })
+      return false
+    }
+
+    if (!newItem.description.trim()) {
+      console.log("⚠️ Description is empty, will use default")
+      // Don't fail validation, just use default
+    }
+
+    console.log("✅ Form validation passed")
+    return true
+  }
+
+  const handleAddItem = async () => {
+    console.log("🎯 handleAddItem called")
+
+    if (!validateForm()) {
+      console.log("❌ Form validation failed")
+      return
+    }
+
+    setIsCreating(true)
+
     try {
-      await addMenuItem({
-        name: newItem.name,
-        description: newItem.description,
+      console.log("📋 Form data:", newItem)
+      console.log("🔧 Variants:", newItemVariants)
+
+      // Prepare clean data with explicit type conversion
+      const cleanImageUrl = newItem.image?.trim() || "/placeholder.svg?height=200&width=300"
+
+      // Prepare variants with proper structure
+      const processedVariants =
+        newItemVariants.length > 0
+          ? newItemVariants.map((variant) => ({
+              id: variant.id,
+              name: variant.name,
+              price: Number(variant.price),
+              image: variant.image?.trim() || undefined,
+              isAvailable: true,
+            }))
+          : []
+
+      // Create menu item data with explicit structure
+      const menuItemData = {
+        name: newItem.name.trim(),
+        description: newItem.description.trim() || "Tavsif kiritilmagan",
         price: Number.parseFloat(newItem.price),
         category: newItem.category,
-        image: newItem.image || "/placeholder.svg?height=200&width=300",
-        isAvailable: true,
+        image: cleanImageUrl,
         preparationTime: Number.parseInt(newItem.preparationTime) || 10,
+        variants: processedVariants.length > 0 ? processedVariants : undefined,
+        isAvailable: true,
         rating: 0,
-        variants: newItemVariants.length > 0 ? newItemVariants : undefined,
-      })
+      }
 
+      console.log("🚀 Sending to Firebase:", menuItemData)
+
+      // Add to Firebase/localStorage
+      const itemId = await addMenuItem(menuItemData)
+
+      console.log("✅ Item created with ID:", itemId)
+
+      // Clear form and close dialog
       clearFormData()
       setIsAddDialogOpen(false)
 
-      // Refresh data
-      if (connectionMode === "local") {
-        window.location.reload()
-      }
-
+      // Show success message without refresh
       toast({
-        title: "Ovqat qo'shildi",
-        description: `${newItem.name} menyuga qo'shildi`,
+        title: "🎉 Muvaffaqiyat!",
+        description: `${newItem.name} menyuga qo'shildi va real vaqtda yangilandi`,
       })
     } catch (error) {
+      console.error("❌ Error in handleAddItem:", error)
+
       toast({
-        title: "Xatolik",
-        description: "Menyu elementini qo'shishda xatolik yuz berdi",
+        title: "❌ Xatolik yuz berdi",
+        description: `Ovqatni qo'shishda muammo: ${error.message || "Noma'lum xatolik"}`,
         variant: "destructive",
       })
+    } finally {
+      setIsCreating(false)
     }
   }
 
   const handleAddCategory = async () => {
-    if (!newCategory.name) {
+    if (!newCategory.name.trim()) {
       toast({
-        title: "Ma'lumot yetishmayapti",
-        description: "Iltimos, kategoriya nomini kiriting",
+        title: "❌ Kategoriya nomi kiritilmagan",
+        description: "Kategoriya nomini kiriting",
         variant: "destructive",
       })
       return
@@ -270,7 +401,7 @@ export default function Dashboard() {
 
     try {
       await addCategory({
-        name: newCategory.name,
+        name: newCategory.name.trim(),
         color: newCategory.color,
       })
 
@@ -280,18 +411,13 @@ export default function Dashboard() {
       })
       setIsCategoryDialogOpen(false)
 
-      // Refresh data
-      if (connectionMode === "local") {
-        window.location.reload()
-      }
-
       toast({
-        title: "Kategoriya qo'shildi",
-        description: `${newCategory.name} kategoriyasi yaratildi`,
+        title: "✅ Kategoriya qo'shildi",
+        description: `${newCategory.name} kategoriyasi real vaqtda yaratildi`,
       })
     } catch (error) {
       toast({
-        title: "Xatolik",
+        title: "❌ Xatolik",
         description: "Kategoriyani qo'shishda xatolik yuz berdi",
         variant: "destructive",
       })
@@ -302,18 +428,13 @@ export default function Dashboard() {
     try {
       await deleteCategory(id)
 
-      // Refresh data
-      if (connectionMode === "local") {
-        window.location.reload()
-      }
-
       toast({
-        title: "Kategoriya o'chirildi",
-        description: `${name} kategoriyasi o'chirildi`,
+        title: "🗑️ Kategoriya o'chirildi",
+        description: `${name} kategoriyasi real vaqtda o'chirildi`,
       })
     } catch (error) {
       toast({
-        title: "Xatolik",
+        title: "❌ Xatolik",
         description: "Kategoriyani o'chirishda xatolik yuz berdi",
         variant: "destructive",
       })
@@ -331,58 +452,64 @@ export default function Dashboard() {
       image: item.image,
     })
     setNewItemVariants(item.variants || [])
+    setImagePreviewStatus(item.image ? "success" : "none")
     setIsEditDialogOpen(true)
   }
 
   const handleUpdateItem = async () => {
-    if (!editingItem || !newItem.name || !newItem.price || !newItem.category) {
-      toast({
-        title: "Ma'lumot yetishmayapti",
-        description: "Iltimos, barcha majburiy maydonlarni to'ldiring",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!validateForm() || !editingItem) return
+
+    setIsUpdating(true)
 
     try {
-      await updateMenuItem(editingItem.id!, {
-        name: newItem.name,
-        description: newItem.description,
+      // Prepare clean data
+      const cleanImageUrl = newItem.image?.trim() || "/placeholder.svg?height=200&width=300"
+
+      // Prepare variants
+      const processedVariants =
+        newItemVariants.length > 0
+          ? newItemVariants.map((variant) => ({
+              ...variant,
+              image: variant.image?.trim() || undefined,
+            }))
+          : undefined
+
+      // Update data
+      const updateData = {
+        name: newItem.name.trim(),
+        description: newItem.description.trim(),
         price: Number.parseFloat(newItem.price),
         category: newItem.category,
-        image: newItem.image || "/placeholder.svg?height=200&width=300",
+        image: cleanImageUrl,
         preparationTime: Number.parseInt(newItem.preparationTime) || 10,
-        variants: newItemVariants.length > 0 ? newItemVariants : undefined,
-      })
+        variants: processedVariants,
+      }
 
-      setNewItem({
-        name: "",
-        description: "",
-        price: "",
-        category: "",
-        preparationTime: "",
-        image: "",
-      })
-      setNewItemVariants([])
-      setCurrentVariant({ name: "", price: "", image: "" })
+      console.log("🔄 Updating menu item:", updateData)
+
+      await updateMenuItem(editingItem.id!, updateData)
+
+      console.log("✅ Menu item updated successfully")
+
+      // Clear form and close dialog
+      clearFormData()
       setEditingItem(null)
       setIsEditDialogOpen(false)
 
-      // Refresh data
-      if (connectionMode === "local") {
-        window.location.reload()
-      }
-
       toast({
-        title: "Ovqat yangilandi",
-        description: `${newItem.name} muvaffaqiyatli yangilandi`,
+        title: "🎉 Ovqat muvaffaqiyatli yangilandi!",
+        description: `${newItem.name} ma'lumotlari real vaqtda yangilandi`,
       })
     } catch (error) {
+      console.error("❌ Error updating menu item:", error)
+
       toast({
-        title: "Xatolik",
-        description: "Ovqatni yangilashda xatolik yuz berdi",
+        title: "❌ Xatolik yuz berdi",
+        description: "Ovqatni yangilashda muammo bo'ldi. Qaytadan urinib ko'ring.",
         variant: "destructive",
       })
+    } finally {
+      setIsUpdating(false)
     }
   }
 
@@ -390,19 +517,14 @@ export default function Dashboard() {
     try {
       await deleteMenuItem(id)
 
-      // Refresh data
-      if (connectionMode === "local") {
-        window.location.reload()
-      }
-
       toast({
-        title: "Ovqat o'chirildi",
-        description: `${name} menyudan olib tashlandi`,
+        title: "🗑️ Ovqat o'chirildi",
+        description: `${name} menyudan real vaqtda olib tashlandi`,
       })
     } catch (error) {
       toast({
-        title: "Xatolik",
-        description: "Menyu elementini o'chirishda xatolik yuz berdi",
+        title: "❌ Xatolik",
+        description: "Ovqatni o'chirishda xatolik yuz berdi",
         variant: "destructive",
       })
     }
@@ -412,19 +534,14 @@ export default function Dashboard() {
     try {
       await toggleMenuItemAvailability(id, !currentStatus)
 
-      // Refresh data
-      if (connectionMode === "local") {
-        window.location.reload()
-      }
-
       toast({
-        title: "Holat yangilandi",
-        description: `${name} hozir ${!currentStatus ? "mavjud" : "mavjud emas"}`,
+        title: "🔄 Holat yangilandi",
+        description: `${name} hozir ${!currentStatus ? "mavjud" : "mavjud emas"} - real vaqtda yangilandi`,
       })
     } catch (error) {
       toast({
-        title: "Xatolik",
-        description: "Element holatini yangilashda xatolik yuz berdi",
+        title: "❌ Xatolik",
+        description: "Holatni yangilashda xatolik yuz berdi",
         variant: "destructive",
       })
     }
@@ -434,18 +551,13 @@ export default function Dashboard() {
     try {
       await toggleMenuItemAvailability(id, false)
 
-      // Refresh data
-      if (connectionMode === "local") {
-        window.location.reload()
-      }
-
       toast({
-        title: "Tugatilgan deb belgilandi",
-        description: `${name} hozir mavjud emas`,
+        title: "❌ Tugatilgan deb belgilandi",
+        description: `${name} hozir mavjud emas - real vaqtda yangilandi`,
       })
     } catch (error) {
       toast({
-        title: "Xatolik",
+        title: "❌ Xatolik",
         description: "Elementni tugatilgan deb belgilashda xatolik yuz berdi",
         variant: "destructive",
       })
@@ -457,21 +569,21 @@ export default function Dashboard() {
       const success = await syncLocalDataToFirebase()
       if (success) {
         toast({
-          title: "Sinxronlash muvaffaqiyatli",
+          title: "🔄 Sinxronlash muvaffaqiyatli",
           description: "Mahalliy ma'lumotlar Firebase bilan sinxronlashtirildi",
         })
-        window.location.reload()
+        setTimeout(() => window.location.reload(), 1000)
       } else {
         toast({
-          title: "Sinxronlashda xatolik",
+          title: "❌ Sinxronlashda xatolik",
           description: "Firebasega ulanib bo'lmadi",
           variant: "destructive",
         })
       }
     } catch (error) {
       toast({
-        title: "Sinxronlashda xatolik",
-        description: "Ma'lumotlarni Firebasega sinxronlashtirishda xatolik yuz berdi",
+        title: "❌ Sinxronlashda xatolik",
+        description: "Ma'lumotlarni sinxronlashtirishda xatolik yuz berdi",
         variant: "destructive",
       })
     }
@@ -506,8 +618,8 @@ export default function Dashboard() {
                   variant="outline"
                   className={`mt-1 sm:mt-0 sm:ml-3 ${
                     connectionMode === "firebase"
-                      ? "text-green-600 border-green-300"
-                      : "text-yellow-600 border-yellow-300"
+                      ? "text-green-600 border-green-300 bg-green-50"
+                      : "text-yellow-600 border-yellow-300 bg-yellow-50"
                   }`}
                 >
                   {connectionMode === "firebase" ? (
@@ -515,7 +627,7 @@ export default function Dashboard() {
                   ) : (
                     <WifiOff className="w-3 h-3 mr-1" />
                   )}
-                  {connectionMode === "firebase" ? "Firebase" : "Mahalliy rejim"}
+                  {connectionMode === "firebase" ? "Firebase" : "Mahalliy"}
                 </Badge>
               </div>
             </div>
@@ -545,9 +657,9 @@ export default function Dashboard() {
             <div className="flex items-center">
               <Database className="w-5 h-5 text-green-600 mr-2" />
               <div>
-                <h3 className="text-sm font-medium text-green-800">Firebasega ulanish muvaffaqiyatli</h3>
+                <h3 className="text-sm font-medium text-green-800">🔥 Firebase ulanishi faol</h3>
                 <p className="text-sm text-green-700 mt-1">
-                  Real vaqt yangilanishlari faol. O'zgarishlar barcha qurilmalarda avtomatik ravishda sinxronlanadi.
+                  Real vaqt yangilanishlari ishlamoqda. Barcha o'zgarishlar avtomatik sinxronlanadi.
                 </p>
               </div>
             </div>
@@ -558,15 +670,15 @@ export default function Dashboard() {
               <div className="flex items-center">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
                 <div>
-                  <h3 className="text-sm font-medium text-yellow-800">Mahalliy rejim faol</h3>
+                  <h3 className="text-sm font-medium text-yellow-800">💾 Mahalliy rejim faol</h3>
                   <p className="text-sm text-yellow-700 mt-1">
-                    Firebasega kirish imkoni yo'q. Ma'lumotlar brauzeringizda mahalliy ravishda saqlanadi.
+                    Firebase ulanmagan. Ma'lumotlar brauzeringizda saqlanadi.
                   </p>
                 </div>
               </div>
               <Button variant="outline" size="sm" onClick={handleSyncToFirebase} className="w-full sm:w-auto">
                 <Database className="w-4 h-4 mr-2" />
-                Sinxronlashga urinib ko'ring
+                Firebase bilan ulanish
               </Button>
             </div>
           </div>
@@ -657,87 +769,137 @@ export default function Dashboard() {
               }}
             >
               <DialogTrigger asChild>
-                <Button className="bg-orange-600 hover:bg-orange-700 h-12">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Ovqat qo'shish
+                <Button className="bg-orange-600 hover:bg-orange-700 h-12" disabled={isCreating}>
+                  {isCreating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                  {isCreating ? "Qo'shilmoqda..." : "Ovqat qo'shish"}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Yangi menyu elementini qo'shish</DialogTitle>
-                  <DialogDescription>Restoran menyusi uchun yangi element yarating</DialogDescription>
+                  <DialogTitle className="flex items-center gap-2">
+                    <ChefHat className="w-5 h-5 text-orange-600" />
+                    Yangi ovqat qo'shish
+                  </DialogTitle>
+                  <DialogDescription>Restoran menyusi uchun yangi ovqat yarating</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label htmlFor="name">Nomi *</Label>
+                    <Label htmlFor="name" className="text-sm font-medium">
+                      Ovqat nomi *
+                    </Label>
                     <Input
                       id="name"
                       value={newItem.name}
                       onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                      placeholder="Element nomi"
+                      placeholder="Masalan: Osh, Manti, Lag'mon"
                       required
+                      className="mt-1"
                     />
                   </div>
+
                   <div>
-                    <Label htmlFor="description">Tavsif</Label>
+                    <Label htmlFor="description" className="text-sm font-medium">
+                      Tavsif
+                    </Label>
                     <Textarea
                       id="description"
                       value={newItem.description}
                       onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                      placeholder="Element tavsifi"
+                      placeholder="Ovqat haqida qisqacha ma'lumot"
+                      className="mt-1"
+                      rows={3}
                     />
                   </div>
+
                   <div>
-                    <Label htmlFor="image">Rasm URL</Label>
+                    <Label htmlFor="image" className="text-sm font-medium flex items-center gap-2">
+                      <ImageIcon className="w-4 h-4" />
+                      Rasm URL manzili
+                    </Label>
                     <Input
                       id="image"
                       value={newItem.image}
-                      onChange={(e) => setNewItem({ ...newItem, image: e.target.value })}
-                      placeholder="https://example.com/image.jpg"
+                      onChange={(e) => handleImageChange(e.target.value)}
+                      placeholder="https://example.com/rasm.jpg yoki https://unsplash.com/..."
+                      className="mt-1"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Faqat internetdagi rasm URL manzilini kiriting. Fayl yuklash imkoni yo'q.
+                    </p>
+
                     {newItem.image && (
-                      <img
-                        src={newItem.image || "/placeholder.svg"}
-                        alt="Preview"
-                        className="mt-2 w-full h-32 object-cover rounded-md"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.src = "/placeholder.svg?height=200&width=300"
-                        }}
-                      />
+                      <div className="mt-3">
+                        <div
+                          className={`relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden border-2 ${
+                            imagePreviewStatus === "success"
+                              ? "border-green-200"
+                              : imagePreviewStatus === "error"
+                                ? "border-red-200"
+                                : "border-gray-200"
+                          }`}
+                        >
+                          {imagePreviewStatus === "loading" && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                              <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                            </div>
+                          )}
+                          <img
+                            src={newItem.image || "/placeholder.svg"}
+                            alt="Rasm oldindan ko'rish"
+                            className="w-full h-full object-cover"
+                            onLoad={() => setImagePreviewStatus("success")}
+                            onError={() => setImagePreviewStatus("error")}
+                          />
+                          <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-medium">
+                            {imagePreviewStatus === "success" && "✅ Yuklandi"}
+                            {imagePreviewStatus === "error" && "❌ Xato"}
+                            {imagePreviewStatus === "loading" && "⏳ Yuklanmoqda"}
+                          </div>
+                        </div>
+                      </div>
                     )}
                   </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="price">Narxi (so'm) *</Label>
+                      <Label htmlFor="price" className="text-sm font-medium">
+                        Narxi (so'm) *
+                      </Label>
                       <Input
                         id="price"
                         type="number"
                         step="0.01"
                         value={newItem.price}
                         onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-                        placeholder="0.00"
+                        placeholder="25000"
                         required
+                        className="mt-1"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="time">Tayyorlash vaqti (daq)</Label>
+                      <Label htmlFor="time" className="text-sm font-medium">
+                        Tayyorlash vaqti (daq)
+                      </Label>
                       <Input
                         id="time"
                         type="number"
                         value={newItem.preparationTime}
                         onChange={(e) => setNewItem({ ...newItem, preparationTime: e.target.value })}
-                        placeholder="10"
+                        placeholder="15"
+                        className="mt-1"
                       />
                     </div>
                   </div>
+
                   <div>
-                    <Label htmlFor="category">Kategoriya *</Label>
+                    <Label htmlFor="category" className="text-sm font-medium">
+                      Kategoriya *
+                    </Label>
                     <Select
                       value={newItem.category}
                       onValueChange={(value) => setNewItem({ ...newItem, category: value })}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className="mt-1">
                         <SelectValue placeholder="Kategoriyani tanlang" />
                       </SelectTrigger>
                       <SelectContent>
@@ -749,12 +911,13 @@ export default function Dashboard() {
                       </SelectContent>
                     </Select>
                   </div>
+
                   <div>
-                    <Label>Variantlar (ixtiyoriy)</Label>
+                    <Label className="text-sm font-medium">Variantlar (ixtiyoriy)</Label>
                     <div className="space-y-3 mt-2">
                       <div className="grid grid-cols-2 gap-2">
                         <Input
-                          placeholder="Variant nomi (masalan: 0.5L)"
+                          placeholder="Variant nomi"
                           value={currentVariant.name}
                           onChange={(e) => setCurrentVariant({ ...currentVariant, name: e.target.value })}
                         />
@@ -797,8 +960,23 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
-                  <Button onClick={handleAddItem} className="w-full bg-orange-600 hover:bg-orange-700">
-                    Menyuga element qo'shish
+
+                  <Button
+                    onClick={handleAddItem}
+                    className="w-full bg-orange-600 hover:bg-orange-700"
+                    disabled={isCreating}
+                  >
+                    {isCreating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Qo'shilmoqda...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4 mr-2" />
+                        Ovqatni saqlash
+                      </>
+                    )}
                   </Button>
                 </div>
               </DialogContent>
@@ -902,12 +1080,18 @@ export default function Dashboard() {
             <Card key={item.id} className="overflow-hidden hover:shadow-lg transition-shadow">
               <div className="aspect-video bg-gray-200 relative">
                 <img
-                  src={item.image || "/placeholder.svg?height=200&width=300"}
+                  src={
+                    item.image && item.image !== "/placeholder.svg?height=200&width=300"
+                      ? item.image
+                      : "/placeholder.svg?height=200&width=300"
+                  }
                   alt={item.name}
                   className="w-full h-full object-cover"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
-                    target.src = "/placeholder.svg?height=200&width=300"
+                    if (target.src !== "/placeholder.svg?height=200&width=300") {
+                      target.src = "/placeholder.svg?height=200&width=300"
+                    }
                   }}
                 />
                 <div className="absolute top-2 right-2">
@@ -1011,77 +1195,124 @@ export default function Dashboard() {
       >
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Menyu elementini tahrirlash</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="w-5 h-5 text-orange-600" />
+              Ovqatni tahrirlash
+            </DialogTitle>
             <DialogDescription>Restoran menyusi elementini tahrirlang</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-name">Nomi *</Label>
+              <Label htmlFor="edit-name" className="text-sm font-medium">
+                Ovqat nomi *
+              </Label>
               <Input
                 id="edit-name"
                 value={newItem.name}
                 onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                placeholder="Element nomi"
+                placeholder="Ovqat nomi"
                 required
+                className="mt-1"
               />
             </div>
+
             <div>
-              <Label htmlFor="edit-description">Tavsif</Label>
+              <Label htmlFor="edit-description" className="text-sm font-medium">
+                Tavsif
+              </Label>
               <Textarea
                 id="edit-description"
                 value={newItem.description}
                 onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                placeholder="Element tavsifi"
+                placeholder="Ovqat tavsifi"
+                className="mt-1"
+                rows={3}
               />
             </div>
+
             <div>
-              <Label htmlFor="edit-image">Rasm URL</Label>
+              <Label htmlFor="edit-image" className="text-sm font-medium flex items-center gap-2">
+                <ImageIcon className="w-4 h-4" />
+                Rasm URL
+              </Label>
               <Input
                 id="edit-image"
                 value={newItem.image}
-                onChange={(e) => setNewItem({ ...newItem, image: e.target.value })}
+                onChange={(e) => handleImageChange(e.target.value)}
                 placeholder="https://example.com/image.jpg"
+                className="mt-1"
               />
+
               {newItem.image && (
-                <img
-                  src={newItem.image || "/placeholder.svg"}
-                  alt="Preview"
-                  className="mt-2 w-full h-32 object-cover rounded-md"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    target.src = "/placeholder.svg?height=200&width=300"
-                  }}
-                />
+                <div className="mt-3">
+                  <div
+                    className={`relative w-full h-48 bg-gray-100 rounded-lg overflow-hidden border-2 ${
+                      imagePreviewStatus === "success"
+                        ? "border-green-200"
+                        : imagePreviewStatus === "error"
+                          ? "border-red-200"
+                          : "border-gray-200"
+                    }`}
+                  >
+                    {imagePreviewStatus === "loading" && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                        <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                      </div>
+                    )}
+                    <img
+                      src={newItem.image || "/placeholder.svg"}
+                      alt="Rasm oldindan ko'rish"
+                      className="w-full h-full object-cover"
+                      onLoad={() => setImagePreviewStatus("success")}
+                      onError={() => setImagePreviewStatus("error")}
+                    />
+                    <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-full px-2 py-1 text-xs font-medium">
+                      {imagePreviewStatus === "success" && "✅ Yuklandi"}
+                      {imagePreviewStatus === "error" && "❌ Xato"}
+                      {imagePreviewStatus === "loading" && "⏳ Yuklanmoqda"}
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="edit-price">Narxi (so'm) *</Label>
+                <Label htmlFor="edit-price" className="text-sm font-medium">
+                  Narxi (so'm) *
+                </Label>
                 <Input
                   id="edit-price"
                   type="number"
                   step="0.01"
                   value={newItem.price}
                   onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-                  placeholder="0.00"
+                  placeholder="25000"
                   required
+                  className="mt-1"
                 />
               </div>
               <div>
-                <Label htmlFor="edit-time">Tayyorlash vaqti (daq)</Label>
+                <Label htmlFor="edit-time" className="text-sm font-medium">
+                  Tayyorlash vaqti (daq)
+                </Label>
                 <Input
                   id="edit-time"
                   type="number"
                   value={newItem.preparationTime}
                   onChange={(e) => setNewItem({ ...newItem, preparationTime: e.target.value })}
-                  placeholder="10"
+                  placeholder="15"
+                  className="mt-1"
                 />
               </div>
             </div>
+
             <div>
-              <Label htmlFor="edit-category">Kategoriya *</Label>
+              <Label htmlFor="edit-category" className="text-sm font-medium">
+                Kategoriya *
+              </Label>
               <Select value={newItem.category} onValueChange={(value) => setNewItem({ ...newItem, category: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Kategoriyani tanlang" />
                 </SelectTrigger>
                 <SelectContent>
@@ -1093,12 +1324,13 @@ export default function Dashboard() {
                 </SelectContent>
               </Select>
             </div>
+
             <div>
-              <Label>Variantlar (ixtiyoriy)</Label>
+              <Label className="text-sm font-medium">Variantlar (ixtiyoriy)</Label>
               <div className="space-y-3 mt-2">
                 <div className="grid grid-cols-2 gap-2">
                   <Input
-                    placeholder="Variant nomi (masalan: 0.5L)"
+                    placeholder="Variant nomi"
                     value={currentVariant.name}
                     onChange={(e) => setCurrentVariant({ ...currentVariant, name: e.target.value })}
                   />
@@ -1141,8 +1373,23 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-            <Button onClick={handleUpdateItem} className="w-full bg-orange-600 hover:bg-orange-700">
-              Menyu elementini yangilash
+
+            <Button
+              onClick={handleUpdateItem}
+              className="w-full bg-orange-600 hover:bg-orange-700"
+              disabled={isUpdating}
+            >
+              {isUpdating ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Yangilanmoqda...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  O'zgarishlarni saqlash
+                </>
+              )}
             </Button>
           </div>
         </DialogContent>
