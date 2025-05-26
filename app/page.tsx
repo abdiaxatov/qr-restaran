@@ -304,27 +304,13 @@ export default function CustomerMenu() {
                 )}
                 {connectionMode === "firebase" ? "Jonli" : "Demo"}
               </Badge>
-              <a href="/login" className="text-sm text-orange-600 hover:text-orange-700 font-medium underline">
-                Admin
-              </a>
             </div>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Search */}
-        <div className="mb-8">
-          <div className="relative max-w-md mx-auto">
-            <Search className="absolute left-4 top-4 h-5 w-5 text-gray-400" />
-            <Input
-              placeholder="Taomlarni qidiring..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 h-14 text-lg border-2 border-orange-200 focus:border-orange-400 rounded-2xl bg-white/80 backdrop-blur-sm shadow-lg"
-            />
-          </div>
-        </div>
+
 
         {/* Menu Items */}
         <div className="mb-4">
