@@ -387,7 +387,7 @@ export default function CustomerMenu() {
 
         {/* Category Tabs - Bottom */}
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-30">
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl mx-auto ">
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               <Button
                 variant={selectedCategory === "all" ? "default" : "outline"}
@@ -409,6 +409,7 @@ export default function CustomerMenu() {
                 </Button>
               ))}
             </div>
+            <p className="text-sm text-gray-500 mt-2 text-center">Ushbu sayt © 2025 <a href="https://abdiaxatov.uz" className="text-orange-600 ml-1 mr-1" target="_blank">Abdiaxatov.uz</a> tomonidan ishlab chiqilgan</p>
           </div>
         </div>
       </div>
