@@ -69,47 +69,11 @@ const getFromLocalStorage = (key: string) => {
 
 // Default data
 const DEFAULT_CATEGORIES: Category[] = [
-  { id: "pizza", name: "Pizza", color: "bg-red-100 text-red-800" },
-  { id: "salad", name: "Salads", color: "bg-green-100 text-green-800" },
-  { id: "main", name: "Main Courses", color: "bg-blue-100 text-blue-800" },
-  { id: "dessert", name: "Desserts", color: "bg-purple-100 text-purple-800" },
-  { id: "beverage", name: "Beverages", color: "bg-yellow-100 text-yellow-800" },
+
 ]
 
 const DEFAULT_MENU_ITEMS: MenuItem[] = [
-  {
-    id: "1",
-    name: "Margherita Pizza",
-    description: "Classic pizza with tomato sauce, mozzarella, and fresh basil",
-    price: 12.99,
-    category: "pizza",
-    image: "/placeholder.svg?height=200&width=300",
-    isAvailable: true,
-    preparationTime: 15,
-    rating: 4.5,
-  },
-  {
-    id: "2",
-    name: "Caesar Salad",
-    description: "Fresh romaine lettuce with caesar dressing, croutons, and parmesan",
-    price: 8.99,
-    category: "salad",
-    image: "/placeholder.svg?height=200&width=300",
-    isAvailable: true,
-    preparationTime: 5,
-    rating: 4.2,
-  },
-  {
-    id: "3",
-    name: "Grilled Salmon",
-    description: "Fresh Atlantic salmon with herbs and lemon",
-    price: 18.99,
-    category: "main",
-    image: "/placeholder.svg?height=200&width=300",
-    isAvailable: true,
-    preparationTime: 20,
-    rating: 4.8,
-  },
+
 ]
 
 // Menu Items Functions

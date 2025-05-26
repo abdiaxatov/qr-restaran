@@ -21,7 +21,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import {
   ChefHat,
   Plus,
-  Search,
   Edit,
   Trash2,
   LogOut,
@@ -43,6 +42,7 @@ import {
   deleteMenuItem,
   toggleMenuItemAvailability,
   addCategory,
+  deleteCategory,
   subscribeToMenuItems,
   subscribeToCategories,
   initializeDefaultCategories,
@@ -252,6 +252,28 @@ export default function Dashboard() {
       toast({
         title: "Xatolik",
         description: "Kategoriyani qo'shishda xatolik yuz berdi",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteCategory = async (id: string, name: string) => {
+    try {
+      await deleteCategory(id)
+
+      // Refresh data
+      if (connectionMode === "local") {
+        window.location.reload()
+      }
+
+      toast({
+        title: "Kategoriya o'chirildi",
+        description: `${name} kategoriyasi o'chirildi`,
+      })
+    } catch (error) {
+      toast({
+        title: "Xatolik",
+        description: "Kategoriyani o'chirishda xatolik yuz berdi",
         variant: "destructive",
       })
     }
@@ -473,19 +495,7 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Connection Status */}
-        {connectionMode === "firebase" ? (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center">
-              <Database className="w-5 h-5 text-green-600 mr-2" />
-              <div>
-                <h3 className="text-sm font-medium text-green-800">Firebasega ulanish muvaffaqiyatli</h3>
-                <p className="text-sm text-green-700 mt-1">
-                  Real vaqt yangilanishlari faol. O'zgarishlar barcha qurilmalarda avtomatik ravishda sinxronlanadi.
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
+        {connectionMode === "firebase" ? null : (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center">
@@ -554,37 +564,9 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Controls */}
-        <div className="flex flex-col gap-4 mb-6">
-          {/* Search */}
-          <div className="w-full">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Menyu elementlarini qidiring..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 h-12"
-              />
-            </div>
-          </div>
-
-          {/* Filters and Actions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="h-12">
-                <SelectValue placeholder="Kategoriya" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Barcha kategoriyalar</SelectItem>
-                {categories.map((category) => (
-                  <SelectItem key={category.id} value={category.name.toLowerCase()}>
-                    {category.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
+        {/* Filters and Actions */}
+        <div className="mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
             <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Mavjudlik" />
@@ -744,17 +726,48 @@ export default function Dashboard() {
 
                   <div className="space-y-2">
                     <Label>Joriy kategoriyalar</Label>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
                       {categories.map((category) => (
-                        <Badge key={category.id} className={category.color}>
-                          {category.name}
-                        </Badge>
+                        <div key={category.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                          <Badge className={category.color}>{category.name}</Badge>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategory(category.id!, category.name)}
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 h-6 w-6 p-0"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
                       ))}
                     </div>
                   </div>
                 </div>
               </DialogContent>
             </Dialog>
+          </div>
+
+          {/* Quick Filter Buttons */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+            <Button
+              variant={selectedCategory === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory("all")}
+              className={`whitespace-nowrap ${selectedCategory === "all" ? "bg-orange-600 hover:bg-orange-700" : ""}`}
+            >
+              Barchasi
+            </Button>
+            {categories.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategory === category.name.toLowerCase() ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(category.name.toLowerCase())}
+                className={`whitespace-nowrap ${selectedCategory === category.name.toLowerCase() ? "bg-orange-600 hover:bg-orange-700" : ""}`}
+              >
+                {category.name}
+              </Button>
+            ))}
           </div>
         </div>
 
