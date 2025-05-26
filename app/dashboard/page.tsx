@@ -49,6 +49,7 @@ import {
   checkFirebaseAccess,
   syncLocalDataToFirebase,
   updateMenuItem,
+  type MenuItemVariant,
 } from "@/lib/firestore"
 
 export default function Dashboard() {
@@ -79,6 +80,39 @@ export default function Dashboard() {
     name: "",
     color: "bg-gray-100 text-gray-800",
   })
+
+  const [newItemVariants, setNewItemVariants] = useState<MenuItemVariant[]>([])
+  const [currentVariant, setCurrentVariant] = useState({
+    name: "",
+    price: "",
+    image: "",
+  })
+
+  const addVariant = () => {
+    if (!currentVariant.name || !currentVariant.price) {
+      toast({
+        title: "Ma'lumot yetishmayapti",
+        description: "Variant nomi va narxini kiriting",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const variant: MenuItemVariant = {
+      id: Date.now().toString(),
+      name: currentVariant.name,
+      price: Number.parseFloat(currentVariant.price),
+      image: currentVariant.image,
+      isAvailable: true,
+    }
+
+    setNewItemVariants([...newItemVariants, variant])
+    setCurrentVariant({ name: "", price: "", image: "" })
+  }
+
+  const removeVariant = (id: string) => {
+    setNewItemVariants(newItemVariants.filter((v) => v.id !== id))
+  }
 
   useEffect(() => {
     let unsubscribeItems: (() => void) | undefined
@@ -167,6 +201,19 @@ export default function Dashboard() {
     return matchesSearch && matchesCategory && matchesAvailability
   })
 
+  const clearFormData = () => {
+    setNewItem({
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      preparationTime: "",
+      image: "",
+    })
+    setNewItemVariants([])
+    setCurrentVariant({ name: "", price: "", image: "" })
+  }
+
   const handleAddItem = async () => {
     if (!newItem.name || !newItem.price || !newItem.category) {
       toast({
@@ -187,16 +234,10 @@ export default function Dashboard() {
         isAvailable: true,
         preparationTime: Number.parseInt(newItem.preparationTime) || 10,
         rating: 0,
+        variants: newItemVariants.length > 0 ? newItemVariants : undefined,
       })
 
-      setNewItem({
-        name: "",
-        description: "",
-        price: "",
-        category: "",
-        preparationTime: "",
-        image: "",
-      })
+      clearFormData()
       setIsAddDialogOpen(false)
 
       // Refresh data
@@ -289,6 +330,7 @@ export default function Dashboard() {
       preparationTime: item.preparationTime.toString(),
       image: item.image,
     })
+    setNewItemVariants(item.variants || [])
     setIsEditDialogOpen(true)
   }
 
@@ -310,6 +352,7 @@ export default function Dashboard() {
         category: newItem.category,
         image: newItem.image || "/placeholder.svg?height=200&width=300",
         preparationTime: Number.parseInt(newItem.preparationTime) || 10,
+        variants: newItemVariants.length > 0 ? newItemVariants : undefined,
       })
 
       setNewItem({
@@ -320,6 +363,8 @@ export default function Dashboard() {
         preparationTime: "",
         image: "",
       })
+      setNewItemVariants([])
+      setCurrentVariant({ name: "", price: "", image: "" })
       setEditingItem(null)
       setIsEditDialogOpen(false)
 
@@ -495,7 +540,19 @@ export default function Dashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Connection Status */}
-        {connectionMode === "firebase" ? null : (
+        {connectionMode === "firebase" ? (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center">
+              <Database className="w-5 h-5 text-green-600 mr-2" />
+              <div>
+                <h3 className="text-sm font-medium text-green-800">Firebasega ulanish muvaffaqiyatli</h3>
+                <p className="text-sm text-green-700 mt-1">
+                  Real vaqt yangilanishlari faol. O'zgarishlar barcha qurilmalarda avtomatik ravishda sinxronlanadi.
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
           <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center">
@@ -566,7 +623,21 @@ export default function Dashboard() {
 
         {/* Filters and Actions */}
         <div className="mb-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="h-12">
+                <SelectValue placeholder="Kategoriya" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Barcha kategoriyalar</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.id} value={category.name.toLowerCase()}>
+                    {category.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select value={availabilityFilter} onValueChange={setAvailabilityFilter}>
               <SelectTrigger className="h-12">
                 <SelectValue placeholder="Mavjudlik" />
@@ -578,7 +649,13 @@ export default function Dashboard() {
               </SelectContent>
             </Select>
 
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <Dialog
+              open={isAddDialogOpen}
+              onOpenChange={(open) => {
+                setIsAddDialogOpen(open)
+                if (!open) clearFormData()
+              }}
+            >
               <DialogTrigger asChild>
                 <Button className="bg-orange-600 hover:bg-orange-700 h-12">
                   <Plus className="w-4 h-4 mr-2" />
@@ -671,6 +748,54 @@ export default function Dashboard() {
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div>
+                    <Label>Variantlar (ixtiyoriy)</Label>
+                    <div className="space-y-3 mt-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          placeholder="Variant nomi (masalan: 0.5L)"
+                          value={currentVariant.name}
+                          onChange={(e) => setCurrentVariant({ ...currentVariant, name: e.target.value })}
+                        />
+                        <Input
+                          type="number"
+                          placeholder="Narxi"
+                          value={currentVariant.price}
+                          onChange={(e) => setCurrentVariant({ ...currentVariant, price: e.target.value })}
+                        />
+                      </div>
+                      <Input
+                        placeholder="Variant rasm URL (ixtiyoriy)"
+                        value={currentVariant.image}
+                        onChange={(e) => setCurrentVariant({ ...currentVariant, image: e.target.value })}
+                      />
+                      <Button type="button" onClick={addVariant} variant="outline" className="w-full">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Variant qo'shish
+                      </Button>
+
+                      {newItemVariants.length > 0 && (
+                        <div className="space-y-2 max-h-32 overflow-y-auto">
+                          {newItemVariants.map((variant) => (
+                            <div key={variant.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                              <span className="text-sm">
+                                {variant.name} - {variant.price.toLocaleString()} so'm
+                              </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeVariant(variant.id)}
+                                className="text-red-500 hover:text-red-700 h-6 w-6 p-0"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <Button onClick={handleAddItem} className="w-full bg-orange-600 hover:bg-orange-700">
                     Menyuga element qo'shish
@@ -877,7 +1002,13 @@ export default function Dashboard() {
       </div>
 
       {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) clearFormData()
+        }}
+      >
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Menyu elementini tahrirlash</DialogTitle>
@@ -961,6 +1092,54 @@ export default function Dashboard() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <Label>Variantlar (ixtiyoriy)</Label>
+              <div className="space-y-3 mt-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    placeholder="Variant nomi (masalan: 0.5L)"
+                    value={currentVariant.name}
+                    onChange={(e) => setCurrentVariant({ ...currentVariant, name: e.target.value })}
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Narxi"
+                    value={currentVariant.price}
+                    onChange={(e) => setCurrentVariant({ ...currentVariant, price: e.target.value })}
+                  />
+                </div>
+                <Input
+                  placeholder="Variant rasm URL (ixtiyoriy)"
+                  value={currentVariant.image}
+                  onChange={(e) => setCurrentVariant({ ...currentVariant, image: e.target.value })}
+                />
+                <Button type="button" onClick={addVariant} variant="outline" className="w-full">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Variant qo'shish
+                </Button>
+
+                {newItemVariants.length > 0 && (
+                  <div className="space-y-2 max-h-32 overflow-y-auto">
+                    {newItemVariants.map((variant) => (
+                      <div key={variant.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                        <span className="text-sm">
+                          {variant.name} - {variant.price.toLocaleString()} so'm
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeVariant(variant.id)}
+                          className="text-red-500 hover:text-red-700 h-6 w-6 p-0"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <Button onClick={handleUpdateItem} className="w-full bg-orange-600 hover:bg-orange-700">
               Menyu elementini yangilash
